@@ -1,0 +1,66 @@
+#Load Data
+#the data was cleaned by pivot table in ms.excel
+library(readxl)
+dataclust <- read_excel("C:/Users/ASUS/Downloads/Data Clustering SEC.xlsx") #the data loaded from personal directory
+str(dataclust)
+head(dataclust)
+
+#data type of column
+qualivar <- dataclust[,1] #Provinsi is qualitative variable
+quantivar <- dataclust[,2:7]
+
+#descriptive statistics & data exploration
+summary(quantivar)
+
+library(psych)
+pairs.panels(quantivar) #there are a couple of variables have high correlation -> indication of multicollinearity
+
+#clustering assumptions: Data Adequacy & Non-Multicollinearity
+#KMO's test for Data Adequacy
+KMO(quantivar) #Data Adequacy is fulfilled
+
+#Spehricity Bartlett's test for Non-Multicollinearity
+cortest.bartlett(quantivar) #there is multicollinearity in data
+
+#PCA for overcome the multicollinearity
+pca.clust <- prcomp(quantivar, scale = TRUE, center = TRUE)
+summary(pca.clust)
+
+#2 principle component selected with 63,8% variance
+dataclust.transform <- as.data.frame(pca.clust$x[,1:2])
+cortest.bartlett(dataclust.transform) #multicollinearity solved
+
+#optimal number of cluster with elbow & sillhouette method
+library(factoextra)
+fviz_nbclust(dataclust.transform, kmeans, method = "wss")
+fviz_nbclust(dataclust.transform, kmeans, method = "silhouette") #optimal number of cluster is 2
+
+#cluster
+library(cluster)
+clust <- kmeans(dataclust.transform, 2)
+clust
+
+#cluster area plot
+fviz_cluster(clust, data = dataclust.transform, geom = "point",
+             show.clust.cent = TRUE,  
+             ggtheme = theme_minimal(),
+             main = "",xlab="",ylab="",
+             alpha = 0)+scale_fill_manual(values = c("green", "red")) 
+
+#extract result to real observation
+result <- data.frame(dataclust.transform, clust$cluster)
+result
+
+#extract cluster profile
+library(dplyr)
+extract <- quantivar %>%
+  mutate(cluster = result$clust.cluster) %>%
+  group_by(cluster) %>%
+  summarise_all("mean")
+extract
+
+#result to excel
+cluster.result <- data.frame(dataclust, clust$cluster)
+
+library(writexl)
+write_xlsx(cluster.result, "C:/Users/ASUS/Downloads/Hasil Klasterisasi.xlsx")
